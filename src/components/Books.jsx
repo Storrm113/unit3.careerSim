@@ -1,1 +1,45 @@
-/* TODO - add your code to create a functional React component that displays all of the available books in the library's catalog. Fetch the book data from the provided API. Users should be able to click on an individual book to navigate to the SingleBook component and view its details. */
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import '../index.css'; // Ensure you import the CSS file
+
+function Books() {
+  const [books, setBooks] = useState([]);
+
+  useEffect(() => {
+    fetch("https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/books")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Fetched data:", data); // Log the data to see what is returned
+        if (data.books && Array.isArray(data.books)) {
+          setBooks(data.books);
+          console.log("Books array:", data.books); // Log the books array to check the structure
+        } else {
+          console.error("Data does not contain books array:", data);
+        }
+      })
+      .catch((err) => console.error("Error fetching books:", err));
+  }, []);
+
+  return (
+    <div className="container">
+      <h1>Library Books</h1>
+      <div className="book-grid">
+        {books.map((book) => (
+          <div key={book.id} className="book-item">
+            <Link to={`/books/${book.id}`}>
+              <img src={book.coverimage} alt={book.title} />
+              <p>{book.title}</p>
+            </Link>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default Books;
