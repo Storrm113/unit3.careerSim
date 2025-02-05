@@ -1,32 +1,41 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect, useContext } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { AuthContext } from "./AuthContext";
+import API_BASE_URL from "./config"; // ✅ Import API base URL
 
-function BookDetail() {
+const BookDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useContext(AuthContext);
+
   const [book, setBook] = useState(null);
   const [error, setError] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem("token")); // Check if user is authenticated
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchBookDetails = async () => {
       try {
-        const response = await fetch(`https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/books/${id}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        console.log(`Fetching book details for ID: ${id}`);
+
+        const response = await fetch(`${API_BASE_URL}/books/${id}`, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!response.ok) throw new Error("Failed to load book details");
+
         const data = await response.json();
-        
-        console.log("Fetched book details:", data); // Check structure in console
-        
-        // If the response is an object with a nested book key, access it properly
+        console.log("Book details fetched:", data);
+
         if (data.book) {
           setBook(data.book);
         } else {
-          throw new Error("Book data not found.");
+          throw new Error("Invalid API response: Book data missing");
         }
       } catch (err) {
         console.error("Error fetching book details:", err);
-        setError("Failed to load book details.");
+        setError(err.message || "Failed to load book details.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -34,84 +43,71 @@ function BookDetail() {
   }, [id]);
 
   const handleCheckOut = async () => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
     try {
+      console.log("Checking out book...");
+
       const token = localStorage.getItem("token");
-      const response = await fetch(`https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/books/${id}/checkout`, {
-        method: "POST",
+      const response = await fetch(`${API_BASE_URL}/books/${id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
+        body: JSON.stringify({ available: false }), // Mark book as checked out
       });
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Failed to check out book: ${response.status}`);
       }
-      const data = await response.json();
-      setBook(data);
+
+      const updatedBook = await response.json();
+      console.log("Book successfully checked out:", updatedBook);
+      setBook(updatedBook.book); // ✅ Update the state with the new book data
     } catch (err) {
-      console.error("Error checking out book:", err);
-      setError("Failed to check out book.");
+      console.error("Error checking out the book:", err);
+      setError(err.message || "Failed to check out the book.");
     }
   };
 
-  const handleReturn = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/books/${id}/return`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setBook(data);
-    } catch (err) {
-      console.error("Error returning book:", err);
-      setError("Failed to return book.");
-    }
-  };
-
-  if (error) {
-    return <div>{error}</div>;
-  }
-
-  if (!book) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div style={{ color: "red" }}>{error}</div>;
 
   return (
     <div>
       <h1>{book.title}</h1>
+
+      {/* Check Out Button at the Top */}
+      <button
+        onClick={handleCheckOut}
+        disabled={!book.available}
+        style={{
+          padding: "10px 15px",
+          backgroundColor: book.available ? "#28a745" : "#ccc",
+          color: "#fff",
+          border: "none",
+          cursor: book.available ? "pointer" : "not-allowed",
+          marginBottom: "10px",
+        }}
+      >
+        {book.available ? "Check Out" : "Checked Out"}
+      </button>
+
       <img
         src={book.coverimage}
         alt={book.title}
+        onError={(e) => (e.target.src = "https://via.placeholder.com/200x300")}
         style={{ width: "200px", height: "300px" }}
-        onError={(e) => {
-          e.target.src = "https://via.placeholder.com/200x300?text=No+Image";
-        }}
       />
       <p>{book.description}</p>
-      <p>
-        <strong>Author:</strong> {book.author}
-      </p>
-      <p>
-        <strong>Available:</strong> {book.available ? "Yes" : "No"}
-      </p>
-      {isAuthenticated && (
-        <div>
-          {book.available ? (
-            <button onClick={handleCheckOut}>Check Out</button>
-          ) : (
-            <button onClick={handleReturn}>Return</button>
-          )}
-        </div>
-      )}
+      <p><strong>Author:</strong> {book.author}</p>
+      <p><strong>Available:</strong> {book.available ? "Yes" : "No"}</p>
     </div>
   );
-}
+};
 
 export default BookDetail;

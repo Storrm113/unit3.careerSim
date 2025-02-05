@@ -1,15 +1,23 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "./components/AuthContext";
+import { AuthProvider, AuthContext } from "./components/AuthContext";
+import { useContext } from "react";
 import Books from "./components/Books";
 import BookDetail from "./components/SingleBook";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import Account from "./components/Account";
 import Navbar from "./components/Navigations";
+import NotFound from "./components/NotFound";
+
+// Protected Route Wrapper
+function ProtectedRoute({ element }) {
+  const { user } = useContext(AuthContext);
+  return user ? element : <Navigate to="/login" />;
+}
 
 function App() {
   return (
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Router>
       <AuthProvider>
         <Navbar />
         <Routes>
@@ -18,7 +26,8 @@ function App() {
           <Route path="/books/:id" element={<BookDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/account" element={<Account />} />
+          <Route path="/account" element={<ProtectedRoute element={<Account />} />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AuthProvider>
     </Router>

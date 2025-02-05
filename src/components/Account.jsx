@@ -1,58 +1,120 @@
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "./AuthContext";
+import API_BASE_URL from "./config"; // ✅ Import API base URL
 
-function Account() {
-  const { user } = useContext(AuthContext);
+const Account = () => {
+  const { user, isAuthenticated } = useContext(AuthContext);
   const [books, setBooks] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAccountDetails = async () => {
+    if (!isAuthenticated) return;
+
+    const fetchCheckedOutBooks = async () => {
       try {
+        console.log("Fetching checked-out books...");
+
         const token = localStorage.getItem("token");
-        const response = await fetch("https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/users/me", {
+        const response = await fetch(`${API_BASE_URL}/reservations`, {
           headers: {
+            "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
           },
         });
+
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`Failed to load checked-out books: ${response.status}`);
         }
+
         const data = await response.json();
-        setBooks(data.books);
+        console.log("API Response for Reservations:", data);
+
+        if (data.reservation && Array.isArray(data.reservation)) {
+          setBooks(data.reservation);
+        } else {
+          throw new Error("Invalid API response format: Missing 'reservation' array.");
+        }
       } catch (err) {
         console.error("Error fetching account details:", err);
-        setError("Failed to load account details.");
+        setError(err.message || "Failed to load your checked-out books.");
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchAccountDetails();
-  }, []);
+    fetchCheckedOutBooks();
+  }, [isAuthenticated]);
 
-  if (error) {
-    return <div>{error}</div>;
-  }
+  const handleReturnBook = async (reservationId) => {
+    try {
+      console.log(`Returning book with reservation ID: ${reservationId}`);
 
-  if (!user) {
-    return <div>Loading...</div>;
-  }
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/reservations/${reservationId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to return book: ${response.status}`);
+      }
+
+      console.log("Book returned successfully!");
+      
+      // Remove the returned book from the state
+      setBooks((prevBooks) => prevBooks.filter((book) => book.id !== reservationId));
+    } catch (err) {
+      console.error("Error returning book:", err);
+      setError(err.message || "Failed to return the book.");
+    }
+  };
+
+  if (!isAuthenticated) return <div>Please log in to access your account.</div>;
+  if (loading) return <div>Loading checked-out books...</div>;
+  if (error) return <div style={{ color: "red" }}>{error}</div>;
 
   return (
     <div>
       <h2>Account</h2>
-      <p><strong>Email:</strong> {user.email}</p>
+      <p><strong>Email:</strong> {user?.email}</p>
       <h3>Checked Out Books</h3>
+
       {books.length > 0 ? (
         <ul>
           {books.map((book) => (
-            <li key={book.id}>{book.title}</li>
+            <li key={book.id} style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
+              <img
+                src={book.coverimage}
+                alt={book.title}
+                style={{ width: "50px", height: "75px", marginRight: "10px" }}
+                onError={(e) => (e.target.src = "https://via.placeholder.com/50x75?text=No+Image")}
+              />
+              <p>{book.title}</p>
+              <button
+                onClick={() => handleReturnBook(book.id)}
+                style={{
+                  marginLeft: "15px",
+                  padding: "5px 10px",
+                  backgroundColor: "#dc3545",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Return
+              </button>
+            </li>
           ))}
         </ul>
       ) : (
-        <p>You have no books checked out.</p>
+        <p>No books checked out.</p>
       )}
     </div>
   );
-}
+};
 
 export default Account;
