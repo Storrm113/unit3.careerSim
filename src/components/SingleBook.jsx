@@ -5,6 +5,7 @@ function BookDetail() {
   const { id } = useParams();
   const [book, setBook] = useState(null);
   const [error, setError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem("token")); // Check if user is authenticated
 
   useEffect(() => {
     const fetchBookDetails = async () => {
@@ -32,6 +33,48 @@ function BookDetail() {
     fetchBookDetails();
   }, [id]);
 
+  const handleCheckOut = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/books/${id}/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setBook(data);
+    } catch (err) {
+      console.error("Error checking out book:", err);
+      setError("Failed to check out book.");
+    }
+  };
+
+  const handleReturn = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/books/${id}/return`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setBook(data);
+    } catch (err) {
+      console.error("Error returning book:", err);
+      setError("Failed to return book.");
+    }
+  };
+
   if (error) {
     return <div>{error}</div>;
   }
@@ -58,6 +101,15 @@ function BookDetail() {
       <p>
         <strong>Available:</strong> {book.available ? "Yes" : "No"}
       </p>
+      {isAuthenticated && (
+        <div>
+          {book.available ? (
+            <button onClick={handleCheckOut}>Check Out</button>
+          ) : (
+            <button onClick={handleReturn}>Return</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

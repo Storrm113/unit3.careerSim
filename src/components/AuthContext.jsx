@@ -1,33 +1,62 @@
-import { createContext, useState } from "react";
+import { createContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export const AuthContext = createContext();
 
-export function AuthProvider({ children }) {
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
-  const login = async (username, password) => {
-    try {
-      const res = await fetch("https://fsa-book-buddy-b6e748d1380d.herokuapp.com/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setUser(data);
-        localStorage.setItem("token", data.token);
-      } else {
-        alert("Login failed!");
-      }
-    } catch (error) {
-      console.error("Login error:", error);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      // Fetch user details using the token
+      fetch("https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/users/me", {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          setUser(data);
+        })
+        .catch((err) => {
+          console.error("Error fetching user details:", err);
+        });
     }
+  }, []);
+
+  const login = (token) => {
+    localStorage.setItem("token", token);
+    fetch("https://fsa-book-buddy-b6e748d1380d.herokuapp.com/api/users/me", {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+      },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setUser(data);
+        navigate("/books");
+      })
+      .catch((err) => {
+        console.error("Error fetching user details:", err);
+      });
   };
 
   const logout = () => {
-    setUser(null);
     localStorage.removeItem("token");
+    setUser(null);
+    navigate("/login");
   };
 
   return (
@@ -35,4 +64,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   );
-}
+};

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { AuthContext } from "./AuthContext";
 
 function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState(null);
+  const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -25,9 +27,7 @@ function Login() {
       }
       const data = await response.json();
       console.log("Login successful:", data);
-      // Save the token to localStorage or context
-      localStorage.setItem("token", data.token);
-      navigate("/books");
+      login(data.token); // Use the login function from AuthContext
     } catch (err) {
       console.error("Login failed:", err);
       setError("Login failed. Please check your credentials and try again.");
